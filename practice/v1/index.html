@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<title>練習プレーヤー</title>
+<style>
+:root{--bg:#0b0b0b;--panel:#17140f;--panel2:#211c13;--line:#3a3226;--gold:#d4af37;--gold2:#f0d77a;--text:#f5f0e1;--muted:#a89f8a;--blue:#4fd2ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans JP","Hiragino Sans",sans-serif}
+body{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+header{padding:12px 16px 8px;border-bottom:1px solid var(--line);background:linear-gradient(#15120c,#0b0b0b)}
+h1{font-size:18px;margin:0 0 6px;color:var(--gold2)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.btn{appearance:none;border:1px solid var(--gold);background:var(--panel);color:var(--gold2);border-radius:12px;min-height:46px;min-width:46px;
+  padding:0 12px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{background:var(--panel2)}
+.btn.on{background:var(--gold);color:#111}
+.btn.small{min-height:40px;font-size:14px;padding:0 10px}
+.btn:disabled{opacity:.4}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;font-size:40px}
+#fname{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+#status{font-size:13px;color:var(--gold2);min-height:18px;margin-top:6px}
+#prog{height:6px;background:#2a241a;border-radius:3px;overflow:hidden;margin-top:6px;display:none}
+#prog i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.lab{font-size:12px;color:var(--muted);min-width:64px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+#strRow.off{opacity:.35;pointer-events:none}
+details{margin-top:8px;font-size:14px;color:var(--muted)}
+summary{color:var(--gold2);min-height:36px;display:flex;align-items:center}
+#where{font-size:14px;color:var(--text)}
+main{padding:8px 10px 30px}
+#chart{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+@media (min-width:700px){#chart{grid-template-columns:repeat(8,1fr)} main{max-width:1100px;margin:0 auto}}
+.bar{position:relative;min-height:58px;border:1px solid var(--line);border-radius:8px;background:#100e0a;padding:14px 4px 4px;cursor:pointer;overflow:hidden}
+.bar .no{position:absolute;top:2px;left:5px;font-size:10px;color:var(--muted)}
+.bar .chs{display:flex;gap:4px;align-items:baseline;flex-wrap:wrap}
+.ch{white-space:nowrap;color:var(--text)}
+.ch .r{font-size:22px;font-weight:800}
+.ch .q{font-size:12px;font-weight:700;margin-left:1px;color:var(--gold2)}
+.ch.sub .r{font-size:15px}
+.ch.none .r{color:var(--muted);font-size:16px}
+.bar.cur{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset;background:#2a2312}
+.bar.inloop{background:#10233a;border-color:#4f8fd2}
+.bar.cur.inloop{background:#2a3a4a}
+.bar.fixed .no{color:var(--blue)}
+.bar .beats{position:absolute;right:4px;top:3px;font-size:9px;color:#6f6656}
+#ctrl{position:fixed;left:0;right:0;bottom:0;background:rgba(15,13,9,.97);border-top:1px solid var(--gold);padding:8px 12px calc(10px + env(safe-area-inset-bottom));z-index:5}
+#seek{width:100%;accent-color:var(--gold);height:26px;margin:0}
+.time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+.ctlrow{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:4px}
+#play{width:56px;height:56px;border-radius:50%;font-size:24px;background:var(--gold);color:#111;border:none}
+#spdv{min-width:52px;text-align:center;font-weight:800;color:var(--gold2);font-size:18px}
+#loopv{font-size:12px;color:#8fc0ff;flex:1;text-align:center}
+.empty{color:var(--muted);font-size:14px;line-height:1.7;padding:12px 6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>練習プレーヤー</h1>
+  <div class="row">
+    <label class="btn file">🎵 曲のファイルを選ぶ<input id="file" type="file" accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg,.aac"></label>
+    <span id="fname">まだ選んでいません</span>
+  </div>
+  <div id="prog"><i></i></div>
+  <div id="status"></div>
+  <div class="row"><span class="lab">聴こえ方</span>
+    <div class="seg" id="fxRow">
+      <button class="btn small" data-fx="orig">元のまま</button>
+      <button class="btn small" data-fx="gtr">ギターを前に</button>
+      <button class="btn small" data-fx="bass">ベースを前に</button>
+    </div>
+  </div>
+  <div class="row" id="strRow"><span class="lab">強さ</span>
+    <div class="seg">
+      <button class="btn small" data-st="1">弱</button>
+      <button class="btn small" data-st="2">中</button>
+      <button class="btn small" data-st="3">強</button>
+    </div>
+  </div>
+  <div class="row"><span class="lab">小節の頭</span><span id="where">－</span></div>
+  <div class="row">
+    <button class="btn small" id="fixHere">今の拍を1小節目にする</button>
+    <button class="btn small" id="fixPrev">← 1拍</button>
+    <button class="btn small" id="fixNext">1拍 →</button>
+    <button class="btn small" id="fixReset">直しを戻す</button>
+    <button class="btn small on" id="follow">追従 ON</button>
+  </div>
+  <details><summary>使い方</summary>
+    <div style="line-height:1.7">①「曲のファイルを選ぶ」でスマホの中の曲を選ぶ（すぐ再生できます。拍・小節・コード名の読み取りは、スマホの中だけで進みます。音のファイルはどこにも送りません）
+    ②「ギターを前に」「ベースを前に」で聴こえ方を変える。強さは 弱（音質優先）・中・強。強さを変えても聞こえる音量がそろうようにしています。「元のまま」は処理を通しません
+    ③−／＋で速さ 50〜100%（音の高さは変わりません）
+    ④小節をタップするとその小節をループ。続けて別の小節をタップするとそこまで広げます。「ループ解除」で戻ります
+    ⑤小節の頭がずれていたら、その拍を鳴らしている時に「今の拍を1小節目にする」。「← 1拍」「1拍 →」は、今の小節の頭を1拍前／後ろにずらします。直した所から後ろは4拍ずつ数え直します（途中でまたずれたら、そこでもう一度直してください）。直した小節の番号は水色
+    ⑥読み取りの結果と直した所は、曲ごとにこのスマホに残ります（同じファイル名・同じ大きさのファイルなら、次からはすぐ表示）<br>
+    コード名は参考です（根音を大きく、マイナーの m を小さく表示。7th などは出しません。パワーコードはメジャーかマイナーのどちらかになります）。4/4拍子のつもりで数えています。</div>
+  </details>
+</header>
+<main><div id="chart"><div class="empty">曲のファイルを選ぶと、ここに小節とコード名が出ます。</div></div></main>
+<div id="ctrl">
+  <input id="seek" type="range" min="0" max="1000" value="0" aria-label="再生位置">
+  <div class="time"><span id="tnow">0:00</span><span id="tlen">0:00</span></div>
+  <div class="ctlrow">
+    <button class="btn" id="back" aria-label="5秒戻る">⏪5</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn" id="slow" aria-label="遅く">−</button><span id="spdv">100%</span><button class="btn" id="fast" aria-label="速く">＋</button>
+    </div>
+    <button id="play" class="btn" aria-label="再生">▶</button>
+  </div>
+  <div class="ctlrow"><button class="btn small" id="unloop">ループ解除</button><span id="loopv"></span></div>
+</div>
+<audio id="au" preload="auto"></audio>
+
+<script type="text/plain" id="workerSrc">
+// ===== 読み取り（Web Worker の中で動く。拍・小節・コード名と、聴こえ方ごとの音量の変化）=====
+"use strict";
+const SR = 22050, NFFT = 4096, HOP = 512, FPS = SR / HOP, CNFFT = 8192, CHOP = 2048;
+let lastPost = 0;
+const prog = (p, msg) => { const now = Date.now(); if (now - lastPost > 150 || p >= 1) { postMessage({ type: "prog", p, msg }); lastPost = now; } };
+function fftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+    for (let i = 0; i < n; i += len) { let cr = 1, ci = 0;
+      for (let k = 0; k < h; k++) { const a = i + k, b = a + h; const tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti; const ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr; } } }
+}
+// 実数の2コマを、1回の複素 FFT でまとめて計算する（結果は1コマずつ計算した時と同じ。時間は約半分）
+function stft(y, nfft, hop, p0, p1, msg) {
+  const n = 1 + Math.max(0, Math.floor((y.length - nfft) / hop)), h = nfft / 2;
+  const win = new Float32Array(nfft); for (let i = 0; i < nfft; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (nfft - 1));
+  const out = new Array(n), re = new Float64Array(nfft), im = new Float64Array(nfft);
+  for (let f = 0; f < n; f += 2) {
+    const o1 = f * hop, o2 = (f + 1) * hop, two = f + 1 < n;
+    for (let i = 0; i < nfft; i++) { re[i] = (y[Math.min(o1 + i, y.length - 1)] || 0) * win[i]; im[i] = two ? (y[Math.min(o2 + i, y.length - 1)] || 0) * win[i] : 0; }
+    fftInPlace(re, im);
+    const ma = new Float32Array(h + 1), mb = two ? new Float32Array(h + 1) : null;
+    for (let k = 0; k <= h; k++) {
+      const k2 = (nfft - k) % nfft, xr = re[k], xi = im[k], yr = re[k2], yi = -im[k2];   // y = X[N-k] の共役
+      ma[k] = Math.hypot((xr + yr) / 2, (xi + yi) / 2);
+      if (two) mb[k] = Math.hypot((xi - yi) / 2, (yr - xr) / 2);
+    }
+    out[f] = ma; if (two) out[f + 1] = mb;
+    if ((f & 255) === 0) prog(p0 + (p1 - p0) * f / n, msg);
+  }
+  return out;
+}
+function onsetEnv(S) {
+  const hz2m = f => 2595 * Math.log10(1 + f / 700), m2hz = m => 700 * (10 ** (m / 2595) - 1), nM = 64;
+  const pts = []; for (let i = 0; i < nM + 2; i++) pts.push(m2hz(hz2m(30) + (hz2m(8000) - hz2m(30)) * i / (nM + 1)));
+  const bands = [];
+  for (let i = 0; i < nM; i++) { const a = pts[i], b = pts[i + 1], c = pts[i + 2], k0 = Math.floor(a * NFFT / SR), k1 = Math.ceil(c * NFFT / SR), w = [];
+    for (let k = k0; k <= k1; k++) { const f = k * SR / NFFT; w.push(Math.max(0, Math.min((f - a) / (b - a), (c - f) / (c - b)))); } bands.push([k0, w]); }
+  const n = S.length, o = new Float32Array(n); let prev = null;
+  for (let t = 0; t < n; t++) { const mel = new Float32Array(nM);
+    for (let i = 0; i < nM; i++) { const [k0, w] = bands[i]; let s = 0; for (let j = 0; j < w.length; j++) { const v = S[t][k0 + j]; s += w[j] * v * v; } mel[i] = Math.log1p(1000 * s); }
+    if (prev) { let d = 0; for (let i = 0; i < nM; i++) d += Math.max(0, mel[i] - prev[i]); o[t] = d / nM; }
+    prev = mel; if ((t & 511) === 0) prog(0.35 + 0.1 * t / n, "音の立ち上がりを調べています"); }
+  const sm = new Float32Array(n);
+  for (let t = 0; t < n; t++) { let s = 0; for (let k = t - 8; k < t + 8; k++) if (k >= 0 && k < n) s += o[k]; sm[t] = Math.max(0, o[t] - s / 16); }
+  let mean = 0; for (const v of sm) mean += v; mean /= n; let sd = 0; for (const v of sm) sd += (v - mean) ** 2; sd = Math.sqrt(sd / n) + 1e-9;
+  for (let t = 0; t < n; t++) sm[t] /= sd; return sm;
+}
+function tempo(o) {
+  const n = o.length, L = Math.floor(FPS * 2.5); let best = 0, bl = 1;
+  for (let lag = Math.floor(FPS * 60 / 240); lag < L; lag++) { let s = 0; for (let i = 0; i + lag < n; i++) s += o[i] * o[i + lag];
+    const bpm = 60 * FPS / lag, w = Math.exp(-0.5 * Math.log2(bpm / 120) ** 2); if (s * w > best) { best = s * w; bl = lag; } }
+  return bl;
+}
+function beatTrack(o, period) {
+  const n = o.length, loc = new Float32Array(n), tight = 100;
+  const ker = []; for (let k = -period; k <= period; k++) ker.push(Math.exp(-0.5 * (k * 32 / period) ** 2));
+  for (let t = 0; t < n; t++) { let s = 0; for (let k = -period; k <= period; k++) { const i = t + k; if (i >= 0 && i < n) s += o[i] * ker[k + period]; } loc[t] = s; }
+  const score = Float32Array.from(loc), back = new Int32Array(n).fill(-1), lo = Math.round(period / 2), hi = Math.round(period * 2);
+  for (let t = 0; t < n; t++) { let bv = -Infinity, bk = -1;
+    for (let p = Math.max(0, t - hi); p < t - lo; p++) { const v = score[p] - tight * Math.log((t - p) / period) ** 2; if (v > bv) { bv = v; bk = p; } }
+    if (bk >= 0) { score[t] = loc[t] + bv; back[t] = bk; } }
+  let t = Math.max(0, n - period * 2), bestT = t; for (let k = t; k < n; k++) if (score[k] > score[bestT]) bestT = k;
+  const beats = []; for (t = bestT; t >= 0; t = back[t]) beats.push(t); beats.reverse();
+  let m = 0; for (const b of beats) m += loc[b]; m /= beats.length; return beats.filter(b => loc[b] > 0.1 * m);
+}
+function chroma(y) {
+  const S = stft(y, CNFFT, CHOP, 0.5, 0.85, "音名を調べています"), n = S.length, nb = CNFFT / 2 + 1, midis = [];
+  for (let m = 28; m < 94; m++) midis.push(m);
+  const rng = midis.map(m => { const lo = 440 * 2 ** ((m - 0.5 - 69) / 12), hi = 440 * 2 ** ((m + 0.5 - 69) / 12); return [Math.ceil(lo * CNFFT / SR), Math.ceil(hi * CNFFT / SR)]; });
+  const C = [], B = [];
+  for (let t = 0; t < n; t++) {
+    const X = rng.map(([a, b]) => { let mx = 0; for (let k = a; k < Math.max(a + 1, b) && k < nb; k++) mx = Math.max(mx, S[t][k]); return mx; });
+    let mxx = 1e-9; for (const v of X) mxx = Math.max(mxx, v);
+    const L = X.map(v => Math.log1p(10 * v / mxx));
+    const W = L.map((v, i) => { let s = 0; for (let k = i - 6; k <= i + 6; k++) if (k >= 0 && k < L.length) s += L[k]; return Math.max(0, v - s / 13); });
+    const c = new Float32Array(12), b = new Float32Array(12);
+    midis.forEach((m, i) => { if (m >= 33) c[m % 12] += W[i]; if (m <= 54) b[m % 12] += W[i]; }); C.push(c); B.push(b);
+  }
+  return [C, B];
+}
+const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+function segMeans(C, edges) { const out = [];
+  for (let i = 0; i + 1 < edges.length; i++) { const a = edges[i], b = Math.max(a + 1, edges[i + 1]); const c = new Float32Array(12);
+    for (let t = a; t < b && t < C.length; t++) for (let k = 0; k < 12; k++) c[k] += C[t][k]; out.push(c); } return out; }
+const norm = v => { let s = 0; for (const x of v) s += x * x; s = Math.sqrt(s) + 1e-9; return Array.from(v, x => x / s); };
+function chords(C, B, cb) {
+  const T = [], lab = [];
+  for (let r = 0; r < 12; r++) for (const [q, iv] of [["", [0, 4, 7]], ["m", [0, 3, 7]]]) { const t = new Float32Array(12); t[r] = 1; t[(r + iv[1]) % 12] = 0.8; t[(r + iv[2]) % 12] = 0.9; T.push(norm(t)); lab.push(NAMES[r] + q); }
+  const edges = cb.concat([C.length]), sc = segMeans(C, edges), sb = segMeans(B, edges);
+  const en = sc.map(c => c.reduce((a, b) => a + b, 0)), med = en.slice().sort((a, b) => a - b)[en.length >> 1];
+  const em = sc.map((c, i) => { const cn = norm(c), bs = sb[i].reduce((a, b) => a + b, 0) + 1e-9;
+    const row = T.map((t, k) => { let d = 0; for (let j = 0; j < 12; j++) d += cn[j] * t[j]; return d + 0.6 * sb[i][Math.floor(k / 2)] / bs; });
+    row.push(en[i] < 0.15 * med ? 2.0 : 0.55); return row; });
+  const K = em[0].length; let s = em[0].slice(); const bp = [];
+  for (let t = 1; t < em.length; t++) { let mx = -Infinity, am = 0; s.forEach((v, k) => { if (v > mx) { mx = v; am = k; } });
+    const row = new Int32Array(K), ns = new Float64Array(K);
+    for (let k = 0; k < K; k++) { if (s[k] >= mx - 0.35) { row[k] = k; ns[k] = s[k]; } else { row[k] = am; ns[k] = mx - 0.35; } ns[k] += em[t][k]; }
+    bp.push(row); s = Array.from(ns); }
+  let k = s.indexOf(Math.max(...s)); const path = [k]; for (let t = em.length - 1; t > 0; t--) { k = bp[t - 1][k]; path.push(k); }
+  return path.reverse().map(k => k === lab.length ? "N" : lab[k]);
+}
+function barPos(C, cb, pen = 2.0) {
+  const edges = cb.concat([C.length]), seg = segMeans(C, edges).map(norm);
+  const ch = seg.map((c, i) => i ? 1 - c.reduce((a, v, j) => a + v * seg[i - 1][j], 0) : 0);
+  const m = ch.reduce((a, b) => a + b, 0) / ch.length + 1e-9, chn = ch.map(v => v / m);
+  let s = [chn[0], 0, 0, 0]; const bp = [];
+  for (let t = 1; t < chn.length; t++) { const row = new Int32Array(4), ns = [0, 0, 0, 0];
+    for (let k = 0; k < 4; k++) { let bv = -Infinity, bj = 0; for (let j = 0; j < 4; j++) { const v = s[j] - ((j + 1) % 4 === k ? 0 : pen); if (v > bv) { bv = v; bj = j; } } row[k] = bj; ns[k] = bv + (k === 0 ? chn[t] : 0); }
+    bp.push(row); s = ns; }
+  let k = s.indexOf(Math.max(...s)); const st = [k]; for (let t = chn.length - 1; t > 0; t--) { k = bp[t - 1][k]; st.push(k); }
+  return st.reverse();
+}
+// ---- 聴こえ方ごとの音量の変化（曲の何か所かを、プレーヤーと同じ処理にかけて、耳の感じ方に近い重みで比べる）
+function coef(kind, f0, q, gain, sr) {
+  const w0 = 2 * Math.PI * f0 / sr, A = 10 ** ((gain || 0) / 40), cw = Math.cos(w0), sw = Math.sin(w0); let b, a;
+  if (kind === "lowpass" || kind === "highpass") { const Q = 10 ** ((q || 0) / 20), al = sw / (2 * Q);
+    b = kind === "lowpass" ? [(1 - cw) / 2, 1 - cw, (1 - cw) / 2] : [(1 + cw) / 2, -(1 + cw), (1 + cw) / 2]; a = [1 + al, -2 * cw, 1 - al]; }
+  else if (kind === "peaking") { const al = sw / (2 * q); b = [1 + al * A, -2 * cw, 1 - al * A]; a = [1 + al / A, -2 * cw, 1 - al / A]; }
+  else { const al = sw / 2 * Math.SQRT2, k = 2 * Math.sqrt(A) * al;
+    if (kind === "lowshelf") { b = [A * ((A + 1) - (A - 1) * cw + k), 2 * A * ((A - 1) - (A + 1) * cw), A * ((A + 1) - (A - 1) * cw - k)]; a = [(A + 1) + (A - 1) * cw + k, -2 * ((A - 1) + (A + 1) * cw), (A + 1) + (A - 1) * cw - k]; }
+    else { b = [A * ((A + 1) + (A - 1) * cw + k), -2 * A * ((A - 1) + (A + 1) * cw), A * ((A + 1) + (A - 1) * cw - k)]; a = [(A + 1) - (A - 1) * cw + k, 2 * ((A - 1) - (A + 1) * cw), (A + 1) - (A - 1) * cw - k]; } }
+  return [b[0] / a[0], b[1] / a[0], b[2] / a[0], a[1] / a[0], a[2] / a[0]];
+}
+function filt(x, c) { const y = new Float32Array(x.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < x.length; i++) { const v = c[0] * x[i] + c[1] * x1 + c[2] * x2 - c[3] * y1 - c[4] * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; } return y; }
+function kEnergy(L, R) { const k1 = coef("highshelf", 1500, null, 4, SR), k2 = coef("highpass", 38, -6, 0, SR); let e = 0;
+  for (const ch of [L, R]) { const z = filt(filt(ch, k1), k2); for (let i = 0; i < z.length; i++) e += z[i] * z[i]; } return e; }
+function loudness(L, R, presets) {
+  const n = L.length, seg = Math.floor(SR * 10), pick = []; for (let i = 1; i <= 6; i++) { const c = Math.floor(n * i / 7); if (c + seg < n) pick.push(c); }
+  if (!pick.length) pick.push(0);
+  const cat = ch => { const out = new Float32Array(pick.length * seg); pick.forEach((c, i) => out.set(ch.subarray(c, Math.min(n, c + seg)), i * seg)); return out; };
+  const l = cat(L), r = cat(R), e0 = kEnergy(l, r) + 1e-12, mk = {};
+  for (const [key, p] of Object.entries(presets)) {
+    const gm = 10 ** (p.m / 20), gs = 10 ** (p.s / 20), a = new Float32Array(l.length), b = new Float32Array(l.length);
+    for (let i = 0; i < l.length; i++) { const M = (l[i] + r[i]) / 2 * gm, S = (l[i] - r[i]) / 2 * gs; a[i] = M + S; b[i] = M - S; }
+    let A = a, B = b; for (const f of p.f) { const c = coef(f[0], f[1], f[2], f[3], SR); A = filt(A, c); B = filt(B, c); }
+    mk[key] = -10 * Math.log10(kEnergy(A, B) / e0);
+  }
+  return mk;
+}
+onmessage = e => {
+  const { L, R, presets } = e.data, t0 = Date.now();
+  const y = new Float32Array(L.length); for (let i = 0; i < y.length; i++) y[i] = (L[i] + R[i]) / 2;
+  const S = stft(y, NFFT, HOP, 0, 0.35, "音を細かく分けています");
+  const o = onsetEnv(S); const per = tempo(o); prog(0.47, "拍を探しています"); const beats = beatTrack(o, per);
+  const [C, B] = chroma(y); prog(0.88, "コード名と小節を決めています");
+  const cb = beats.map(b => Math.min(C.length - 1, Math.max(0, Math.round((b * HOP + NFFT / 2 - CNFFT / 2) / CHOP))));
+  const pos = barPos(C, cb), ch = chords(C, B, cb);
+  prog(0.95, "音量のそろえ方を計算しています"); const mk = loudness(L, R, presets);
+  prog(1, "できました");
+  postMessage({ type: "done", res: { v: 1, bpm: 60 * FPS / per, beats: beats.map(b => +(b / FPS + NFFT / 2 / SR).toFixed(3)), pos, chords: ch, mk, sec: (Date.now() - t0) / 1000 } });
+};
+</script>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const au = $("au");
+const fmt = t => { t = Math.max(0, t || 0); return Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0"); };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+};
+// ---- 聴こえ方（真ん中＝M、横＝S の音量 dB と、左右両方にかけるイコライザー）。弱＝音質優先、強＝調査の「両方（強め）」
+const PRESETS = {
+  gtr1: { m: -4, s: 2, f: [["highpass", 100, -3.0, 0], ["peaking", 900, 0.9, 2]] },
+  gtr2: { m: -8, s: 3, f: [["highpass", 130, -3.0, 0], ["peaking", 900, 0.9, 3], ["highshelf", 6000, null, -4]] },
+  gtr3: { m: -12, s: 5, f: [["highpass", 160, -3.0, 0], ["peaking", 900, 0.9, 5], ["peaking", 2500, 1.0, 2], ["highshelf", 5500, null, -9]] },
+  bass1: { m: 0, s: -8, f: [["lowshelf", 200, null, 5], ["highshelf", 1500, null, -5]] },
+  bass2: { m: 0, s: -14, f: [["lowshelf", 180, null, 8], ["peaking", 700, 1.0, 3], ["highshelf", 1500, null, -10]] },
+  bass3: { m: 0, s: -20, f: [["lowshelf", 200, null, 10], ["peaking", 600, 1.0, 4], ["highshelf", 1200, null, -14]] },
+};
+// 曲を読み取る前に使う、音量のそろえ（3曲の平均。読み取りが終わるとその曲の値に変わる）
+const MK_DEFAULT = { gtr1: 2.3, gtr2: 3.6, gtr3: 1.2, bass1: -1.1, bass2: -3.0, bass3: -4.6 };
+
+let song = null;          // { key, name, size }
+let ana = null;           // 読み取り結果 { bpm, beats, pos, chords, mk, anchors }
+let bars = [];            // [{ b0, b1, t0, t1, no, fixed }]
+let fx = "orig", strength = 2, rate = 1, follow = true;
+let loop = null;          // { a, b }（小節の番号の範囲）
+let worker = null;
+
+// ---------------- 音の処理（Web Audio）。「元のまま」は処理の部品を一切通さない
+let ctx = null, src = null, G = null;
+function ensureGraph() {
+  if (G) return;
+  if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)(); src = ctx.createMediaElementSource(au); }
+  const gain = v => { const n = ctx.createGain(); n.gain.value = v; return n; };
+  const up = gain(1);                               // モノラルの曲は、ここで左右に同じ音にする
+  up.channelCount = 2; up.channelCountMode = "explicit"; up.channelInterpretation = "speakers";
+  const split = ctx.createChannelSplitter(2);
+  up.connect(split);
+  const mL = gain(0.5), mR = gain(0.5), sL = gain(0.5), sR = gain(-0.5), M = gain(1), S = gain(1), sNeg = gain(-1);
+  const merge = ctx.createChannelMerger(2);
+  split.connect(mL, 0); split.connect(mR, 1); split.connect(sL, 0); split.connect(sR, 1);
+  mL.connect(M); mR.connect(M); sL.connect(S); sR.connect(S);
+  M.connect(merge, 0, 0); S.connect(merge, 0, 0); M.connect(merge, 0, 1); S.connect(sNeg); sNeg.connect(merge, 0, 1);
+  const makeup = gain(1);
+  // 処理の前と後の大きさを測る（耳の感じ方に近い重み）。後は「音量合わせ」の前で測る
+  const kTap = node => { const k1 = ctx.createBiquadFilter(); k1.type = "highshelf"; k1.frequency.value = 1500; k1.gain.value = 4;
+    const k2 = ctx.createBiquadFilter(); k2.type = "highpass"; k2.frequency.value = 38; k2.Q.value = -6;
+    const an = ctx.createAnalyser(); an.fftSize = 2048; node.connect(k1); k1.connect(k2); k2.connect(an); return an; };
+  const pre = kTap(up), post = ctx.createGain();
+  const postAn = kTap(post);
+  const lim = ctx.createDynamicsCompressor();       // 音割れ防止（大きい所だけ働く）
+  lim.threshold.value = -1; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.1;
+  post.connect(makeup); makeup.connect(lim); lim.connect(ctx.destination);
+  G = { split: up, M, S, merge, post, makeup, lim, filters: [], pre, postAn, ePre: 0, ePost: 0 };
+  setInterval(agcStep, 100);
+}
+function routeAudio() {
+  if (fx === "orig") {
+    if (!ctx) return;                                 // 一度も処理を使っていなければ、Web Audio 自体を作らない
+    src.disconnect(); if (G) { G.merge.disconnect(); G.filters.forEach(f => f.disconnect()); }
+    src.connect(ctx.destination);                     // 部品を通さず、そのまま出す
+    return;
+  }
+  try { ensureGraph(); } catch (err) {               // 万一ここで失敗しても、音が消えないように「元のまま」に戻す
+    if (src) { try { src.disconnect(); src.connect(ctx.destination); } catch (e) {} }
+    fx = "orig"; showFx();
+    $("status").textContent = "このスマホでは聴こえ方の処理が使えませんでした（" + err.message + "）。元のままで鳴らします";
+    return;
+  }
+  if (ctx.state === "suspended") ctx.resume();
+  const key = fx + strength, p = PRESETS[key];
+  src.disconnect(); G.merge.disconnect(); G.filters.forEach(f => f.disconnect());
+  G.M.gain.value = 10 ** (p.m / 20); G.S.gain.value = 10 ** (p.s / 20);
+  G.filters = p.f.map(([type, f0, q, g]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f0;
+    if (q !== null) b.Q.value = q; b.gain.value = g; return b; });
+  let node = G.merge; for (const f of G.filters) { node.connect(f); node = f; }
+  node.connect(G.post);
+  const mk = (ana && ana.mk && ana.mk[key] !== undefined) ? ana.mk[key] : MK_DEFAULT[key];
+  G.makeup.gain.cancelScheduledValues(ctx.currentTime);
+  G.makeup.gain.value = 10 ** (mk / 20);             // はじめは、その曲で計算した値
+  G.ePre = G.ePost = 0;
+  src.connect(G.split);
+}
+// 音量合わせ: 処理の前と後の大きさ（約1.5秒の平均）を比べ、後が前と同じになるよう、音量をゆっくり（0.4秒かけて）変える
+const agcBuf = new Float32Array(2048);
+function meanSq(an) { an.getFloatTimeDomainData(agcBuf); let s = 0; for (let i = 0; i < agcBuf.length; i++) s += agcBuf[i] * agcBuf[i]; return s / agcBuf.length; }
+function agcStep() {
+  if (!G || fx === "orig" || au.paused || ctx.state !== "running") return;
+  const a = meanSq(G.pre), b = meanSq(G.postAn);
+  if (a < 1e-7) return;                              // ほとんど無音の所では変えない
+  const k = G.ePre ? 0.07 : 1;
+  G.ePre += k * (a - G.ePre); G.ePost += k * (b - G.ePost);
+  if (G.ePost < 1e-9) return;
+  const db = Math.max(-12, Math.min(12, 10 * Math.log10(G.ePre / G.ePost)));
+  G.makeup.gain.setTargetAtTime(10 ** (db / 20), ctx.currentTime, 0.4);
+}
+function showFx() {
+  document.querySelectorAll("[data-fx]").forEach(b => b.classList.toggle("on", b.dataset.fx === fx));
+  document.querySelectorAll("[data-st]").forEach(b => b.classList.toggle("on", +b.dataset.st === strength));
+  $("strRow").classList.toggle("off", fx === "orig");
+}
+function setFx(k, st) {
+  if (k) fx = k; if (st) strength = st;
+  store.set("pp:fx", { fx, strength });
+  showFx(); routeAudio();
+}
+
+// ---------------- 速さ（音の高さは変えない）
+function setRate(r) {
+  rate = Math.min(1, Math.max(0.5, Math.round(r * 20) / 20));
+  au.playbackRate = rate;
+  try { au.preservesPitch = true; au.webkitPreservesPitch = true; } catch (e) {}
+  $("spdv").textContent = Math.round(rate * 100) + "%";
+}
+
+// ---------------- 小節（拍ごとの「小節の何拍目か」＋手で直した所）
+function finalPos() {
+  // 手で直した拍を1拍目にして、そこから次の直しまでは4拍ずつ数える（分かりやすさを優先）。直しより前は読み取ったまま
+  const a = ana, n = a.beats.length, out = new Array(n), anc = (a.anchors || []).slice().sort((x, y) => x - y);
+  let cur = -1, ai = 0;
+  for (let k = 0; k < n; k++) {
+    while (ai < anc.length && anc[ai] <= k) cur = anc[ai++];
+    out[k] = cur >= 0 ? (k - cur) % 4 : a.pos[k];
+  }
+  return out;
+}
+function buildBars() {
+  bars = [];
+  if (!ana || !ana.beats.length) return;
+  const pos = finalPos(), bt = ana.beats, dur = au.duration || (bt[bt.length - 1] + 2);
+  const anc = new Set(ana.anchors || []);
+  const starts = []; pos.forEach((p, k) => { if (p === 0) starts.push(k); });
+  if (!starts.length || starts[0] > 0) starts.unshift(0);
+  let no = pos[0] === 0 ? 1 : 0;   // 1小節目より前（弾き出し）は 0
+  for (let i = 0; i < starts.length; i++) {
+    const b0 = starts[i], b1 = i + 1 < starts.length ? starts[i + 1] : bt.length;
+    let fixed = false; for (const x of anc) if (x >= b0 && x < b1) fixed = true;
+    bars.push({ b0, b1, t0: i === 0 ? 0 : bt[b0], t1: b1 < bt.length ? bt[b1] : dur, no: no++, fixed });
+  }
+}
+function chordHtml(c, sub) {
+  if (!c || c === "N") return `<span class="ch none${sub ? " sub" : ""}"><span class="r">－</span></span>`;
+  const m = c.endsWith("m"), r = m ? c.slice(0, -1) : c;
+  return `<span class="ch${sub ? " sub" : ""}"><span class="r">${r}</span>${m ? '<span class="q">m</span>' : ""}</span>`;
+}
+let barEls = [];
+function render() {
+  const box = $("chart");
+  if (!ana) { box.innerHTML = '<div class="empty">' + (song ? "読み取りが終わると、ここに小節とコード名が出ます。" : "曲のファイルを選ぶと、ここに小節とコード名が出ます。") + "</div>"; barEls = []; return; }
+  buildBars();
+  box.innerHTML = "";
+  barEls = bars.map((br, i) => {
+    const d = document.createElement("div");
+    d.className = "bar" + (br.fixed ? " fixed" : "");
+    const list = []; for (let k = br.b0; k < br.b1; k++) { const c = ana.chords[k]; if (!list.length || list[list.length - 1] !== c) list.push(c); }
+    const shown = list.slice(0, 3);
+    d.innerHTML = `<span class="no">${br.no === 0 ? "前" : br.no}</span>` + (br.b1 - br.b0 !== 4 ? `<span class="beats">${br.b1 - br.b0}拍</span>` : "") +
+      `<div class="chs">${shown.map((c, j) => chordHtml(c, j > 0)).join("")}${list.length > 3 ? '<span class="ch sub"><span class="r">…</span></span>' : ""}</div>`;
+    d.addEventListener("click", () => barTap(i));
+    box.appendChild(d);
+    return d;
+  });
+  drawLoop(); lastBar = -2; tick(true);
+}
+
+// ---------------- ループ（小節をタップ。続けて別の小節をタップすると、そこまで広げる）
+function barTap(i) {
+  if (loop && !(i >= loop.a && i <= loop.b)) { loop = { a: Math.min(loop.a, i), b: Math.max(loop.b, i) }; }
+  else { loop = { a: i, b: i }; if (au.src) au.currentTime = bars[i].t0; }
+  drawLoop(); tick(true);
+}
+function drawLoop() {
+  barEls.forEach((e, i) => e.classList.toggle("inloop", !!loop && i >= loop.a && i <= loop.b));
+  $("loopv").textContent = loop ? `ループ：${label(loop.a)}〜${label(loop.b)}小節目` : "";
+}
+const label = i => bars[i] ? (bars[i].no === 0 ? "前" : String(bars[i].no)) : "?";
+
+// ---------------- 小節の頭を手で直す
+function curBeat() {
+  const t = au.currentTime || 0, bt = ana.beats;
+  let lo = 0, hi = bt.length - 1;
+  if (t < bt[0]) return 0;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (bt[m] <= t + 0.03) lo = m; else hi = m - 1; }
+  return lo;
+}
+function curBarIdx() { const k = curBeat(); return bars.findIndex(b => k >= b.b0 && k < b.b1); }
+function addAnchor(k) {
+  const a = new Set(ana.anchors || []);
+  a.add(Math.max(0, Math.min(ana.beats.length - 1, k)));
+  ana.anchors = [...a].sort((x, y) => x - y);
+  saveAna(); render();
+}
+function fixShift(d) {
+  const i = curBarIdx(); if (i < 0) return;
+  const b0 = bars[i].b0, a = new Set(ana.anchors || []);
+  a.delete(b0); a.add(Math.max(0, Math.min(ana.beats.length - 1, b0 + d)));
+  ana.anchors = [...a].sort((x, y) => x - y);
+  saveAna(); render();
+  $("status").textContent = "小節の頭を1拍" + (d < 0 ? "前" : "後ろ") + "にずらしました";
+}
+
+// ---------------- 再生位置の表示
+let lastBar = -2;
+function tick(force) {
+  const t = au.currentTime || 0;
+  if (loop && bars[loop.b] && t >= bars[loop.b].t1 - 0.01) { au.currentTime = bars[loop.a].t0; }
+  $("tnow").textContent = fmt(t);
+  if (au.duration) $("seek").value = Math.round(t / au.duration * 1000);
+  if (!ana || !bars.length) return;
+  const k = curBeat(), i = bars.findIndex(b => k >= b.b0 && k < b.b1);
+  if (i !== lastBar || force) {
+    if (barEls[lastBar]) barEls[lastBar].classList.remove("cur");
+    if (barEls[i]) {
+      barEls[i].classList.add("cur");
+      if (follow && (!au.paused || force)) {
+        const r = barEls[i].getBoundingClientRect();
+        if (r.top < 120 || r.bottom > window.innerHeight - 170) window.scrollTo({ top: Math.max(0, r.top + window.scrollY - window.innerHeight * 0.3), behavior: force ? "auto" : "smooth" });
+      }
+    }
+    lastBar = i;
+  }
+  const br = bars[i];
+  if (br) $("where").textContent = `${br.no === 0 ? "1小節目の前" : br.no + "小節目"}・${k - br.b0 + 1}拍目` + (ana.bpm ? `（テンポ 約${Math.round(ana.bpm)}）` : "");
+}
+function loopFrame() { if (!au.paused) tick(false); requestAnimationFrame(loopFrame); }
+
+// ---------------- 曲を開く・読み取る
+const keyOf = f => "pp:song:" + f.name + ":" + f.size;
+function saveAna() { if (song && ana) store.set(song.key, Object.assign({}, ana)); }
+function setProg(p, msg) {
+  $("prog").style.display = p >= 1 ? "none" : "block";
+  $("prog").firstElementChild.style.width = Math.round(p * 100) + "%";
+  if (msg) $("status").textContent = (p >= 1 ? "" : "読み取り中 " + Math.round(p * 100) + "%：") + msg;
+}
+async function openFile(f) {
+  if (worker) { worker.terminate(); worker = null; }
+  if (au.src) URL.revokeObjectURL(au.src);
+  au.src = URL.createObjectURL(f);
+  setRate(rate);
+  song = { key: keyOf(f), name: f.name, size: f.size };
+  $("fname").textContent = f.name;
+  loop = null; drawLoop();
+  ana = store.get(song.key, null);
+  if (ana && ana.v === 1) {
+    render();
+    $("status").textContent = "前に読み取った結果を使っています（" + bars.length + "小節）";
+    routeAudio();
+    return;
+  }
+  ana = null; render();
+  setProg(0.01, "音を読み込んでいます");
+  try {
+    const buf = await f.arrayBuffer();
+    const oc = new OfflineAudioContext(2, 22050, 22050);
+    const ab = await oc.decodeAudioData(buf);
+    const L = ab.getChannelData(0), R = ab.numberOfChannels > 1 ? ab.getChannelData(1) : ab.getChannelData(0);
+    const p = {}; for (const [k, v] of Object.entries(PRESETS)) p[k] = v;
+    const wsrc = $("workerSrc").textContent;
+    worker = new Worker(URL.createObjectURL(new Blob([wsrc], { type: "text/javascript" })));
+    const myKey = song.key;
+    worker.onmessage = e => {
+      if (!song || song.key !== myKey) return;
+      if (e.data.type === "prog") setProg(e.data.p, e.data.msg);
+      else if (e.data.type === "done") {
+        ana = Object.assign(e.data.res, { anchors: [] });
+        const ok = store.set(song.key, ana);
+        render(); routeAudio();
+        setProg(1);
+        $("status").textContent = `読み取りました（${e.data.res.sec.toFixed(1)}秒・${bars.length}小節・テンポ 約${Math.round(ana.bpm)}）` + (ok ? "" : "　※スマホの中に保存できませんでした");
+        worker.terminate(); worker = null;
+      }
+    };
+    worker.onerror = e => { setProg(1); $("status").textContent = "読み取りに失敗しました（" + e.message + "）。再生はできます"; };
+    const Lc = new Float32Array(L), Rc = new Float32Array(R);
+    worker.postMessage({ L: Lc, R: Rc, presets: p }, [Lc.buffer, Rc.buffer]);
+  } catch (err) {
+    setProg(1); $("status").textContent = "この音のファイルは読み取れませんでした（" + err.message + "）。再生はできるかもしれません";
+  }
+}
+
+// ---------------- はじまり
+function init() {
+  const s = store.get("pp:fx", null);
+  if (s) { fx = s.fx; strength = s.strength || 2; }
+  showFx(); setRate(1);
+  $("file").addEventListener("change", e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ""; });
+  document.querySelectorAll("[data-fx]").forEach(b => b.addEventListener("click", () => setFx(b.dataset.fx)));
+  document.querySelectorAll("[data-st]").forEach(b => b.addEventListener("click", () => setFx(null, +b.dataset.st)));
+  au.addEventListener("loadedmetadata", () => { $("tlen").textContent = fmt(au.duration); setRate(rate); if (ana) render(); });
+  au.addEventListener("play", () => { $("play").textContent = "⏸"; });
+  au.addEventListener("pause", () => { $("play").textContent = "▶"; });
+  $("play").addEventListener("click", () => {
+    if (!au.src) { $("status").textContent = "先に「曲のファイルを選ぶ」で曲を選んでください"; return; }
+    if (fx !== "orig") routeAudio();               // 前回の聴こえ方を、ここで（タップの時に）つなぐ
+    if (ctx && ctx.state === "suspended") ctx.resume();
+    if (au.paused) au.play(); else au.pause();
+  });
+  $("seek").addEventListener("input", e => { if (au.duration) { au.currentTime = e.target.value / 1000 * au.duration; tick(true); } });
+  $("back").addEventListener("click", () => { au.currentTime = Math.max(0, (au.currentTime || 0) - 5); tick(true); });
+  $("slow").addEventListener("click", () => setRate(rate - 0.05));
+  $("fast").addEventListener("click", () => setRate(rate + 0.05));
+  $("unloop").addEventListener("click", () => { loop = null; drawLoop(); });
+  $("fixHere").addEventListener("click", () => { if (!ana) return; addAnchor(curBeat()); $("status").textContent = "今の拍を1小節目の頭にしました（ここから後ろは4拍ずつ数え直し）"; });
+  $("fixPrev").addEventListener("click", () => { if (ana) fixShift(-1); });
+  $("fixNext").addEventListener("click", () => { if (ana) fixShift(1); });
+  $("fixReset").addEventListener("click", () => {
+    if (!ana || !(ana.anchors || []).length) { $("status").textContent = "直した所はありません"; return; }
+    if (!confirm("小節の頭の直しを全部戻しますか？")) return;
+    ana.anchors = []; saveAna(); render(); $("status").textContent = "小節の頭を、読み取った時のままに戻しました";
+  });
+  $("follow").addEventListener("click", () => { follow = !follow; $("follow").textContent = "追従 " + (follow ? "ON" : "OFF"); $("follow").classList.toggle("on", follow); });
+  let rt = null; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => tick(true), 200); });
+  requestAnimationFrame(loopFrame);
+}
+init();
+</script>
+</body>
+</html>
