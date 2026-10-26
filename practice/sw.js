@@ -3,7 +3,7 @@
 // - 新しい版（VERSION が変わる）が出ると、裏で新しい部品を用意し、ページの「更新する」で切り替える
 // - 「共有」で受け取った曲は、ページに渡すまでの間だけ覚えておき、渡したらすぐ忘れる（保存しない）
 "use strict";
-const VERSION = "2.0.0";
+const VERSION = "2.0.1";
 const CACHE = "practice-" + VERSION;
 const FILES = ["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png",
   "./icons/icon-maskable-512.png", "./icons/favicon-64.png"];

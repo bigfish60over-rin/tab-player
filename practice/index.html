@@ -61,7 +61,7 @@ main{padding:8px 10px 30px}
 #play{width:56px;height:56px;border-radius:50%;font-size:24px;background:var(--gold);color:#111;border:none}
 #spdv{min-width:52px;text-align:center;font-weight:800;color:var(--gold2);font-size:18px}
 #loopv{font-size:12px;color:#8fc0ff;flex:1;text-align:center}
-.empty{color:var(--muted);font-size:14px;line-height:1.7;padding:12px 6px}
+.empty{grid-column:1/-1;color:var(--muted);font-size:14px;line-height:1.7;padding:12px 6px}
 </style>
 </head>
 <body>
@@ -598,7 +598,7 @@ function init() {
 init();
 
 // ---------------- アプリ（PWA）: ホーム画面に追加・電波なしで開く・更新・共有から開く
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.0.1";
 (function pwa() {
   const info = $("appInfo");
   const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
